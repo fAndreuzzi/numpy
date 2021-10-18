@@ -87,7 +87,7 @@ PyArray_OutputConverter(PyObject *object, PyArrayObject **address)
  * Remember to free the pointer seq.ptr when done using
  * PyDimMem_FREE(seq.ptr)**
  */
-\NPY_NO_EXPORT int
+NPY_NO_EXPORT int
 PyArray_IntpConverter(PyObject *obj, PyArray_Dims *seq)
 {
     Py_ssize_t len;
@@ -107,6 +107,12 @@ PyArray_IntpConverter(PyObject *obj, PyArray_Dims *seq)
                 "deprecated.") < 0){
             return NPY_FAIL;
         }
+        return NPY_SUCCEED;
+    }
+
+    if (PyLong_CheckExact(obj)) {
+        seq->ptr = npy_alloc_cache_dim(1);
+        PyArray_IntpFromInt(obj, (npy_intp *)seq->ptr);
         return NPY_SUCCEED;
     }
 
