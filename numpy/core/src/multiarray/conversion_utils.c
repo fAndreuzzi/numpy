@@ -87,7 +87,7 @@ PyArray_OutputConverter(PyObject *object, PyArrayObject **address)
  * Remember to free the pointer seq.ptr when done using
  * PyDimMem_FREE(seq.ptr)**
  */
-NPY_NO_EXPORT int
+\NPY_NO_EXPORT int
 PyArray_IntpConverter(PyObject *obj, PyArray_Dims *seq)
 {
     Py_ssize_t len;
@@ -148,6 +148,7 @@ PyArray_IntpConverter(PyObject *obj, PyArray_Dims *seq)
     }
     return NPY_SUCCEED;
 }
+
 
 /*
  * Like PyArray_IntpConverter, but leaves `seq` untouched if `None` is passed
@@ -971,53 +972,64 @@ PyArray_IntpFromIndexSequence(PyObject *seq, npy_intp *vals, npy_intp maxvals)
     npy_intp i;
     PyObject *op, *err;
 
-    /*
-     * Check to see if sequence is a single integer first.
-     * or, can be made into one
-     */
-    nd = PySequence_Length(seq);
-    if (nd == -1) {
-        if (PyErr_Occurred()) {
-            PyErr_Clear();
-        }
-
-        vals[0] = PyArray_PyIntAsIntp(seq);
-        if(vals[0] == -1) {
-            err = PyErr_Occurred();
-            if (err &&
-                    PyErr_GivenExceptionMatches(err, PyExc_OverflowError)) {
-                PyErr_SetString(PyExc_ValueError,
-                        "Maximum allowed dimension exceeded");
-            }
-            if(err != NULL) {
-                return -1;
-            }
-        }
-        nd = 1;
-    }
-    else {
-        for (i = 0; i < PyArray_MIN(nd,maxvals); i++) {
-            op = PySequence_GetItem(seq, i);
-            if (op == NULL) {
-                return -1;
+    if (maxvals == 1) {
+        return PyArray_IntpFromInt(seq, vals);
+    } else {
+        /*
+        * Check to see if sequence is a single integer first.
+        * or, can be made into one
+        */
+        nd = PySequence_Length(seq);
+        if (nd == -1) {
+            if (PyErr_Occurred()) {
+                PyErr_Clear();
             }
 
-            vals[i] = PyArray_PyIntAsIntp(op);
-            Py_DECREF(op);
-            if(vals[i] == -1) {
-                err = PyErr_Occurred();
-                if (err &&
-                        PyErr_GivenExceptionMatches(err, PyExc_OverflowError)) {
-                    PyErr_SetString(PyExc_ValueError,
-                            "Maximum allowed dimension exceeded");
-                }
-                if(err != NULL) {
+            nd = PyArray_IntpFromInt(seq, vals);
+        }
+        else {
+            for (i = 0; i < PyArray_MIN(nd,maxvals); i++) {
+                op = PySequence_GetItem(seq, i);
+                if (op == NULL) {
                     return -1;
                 }
+
+                vals[i] = PyArray_PyIntAsIntp(op);
+                Py_DECREF(op);
+                if(vals[i] == -1) {
+                    err = PyErr_Occurred();
+                    if (err &&
+                            PyErr_GivenExceptionMatches(err, PyExc_OverflowError)) {
+                        PyErr_SetString(PyExc_ValueError,
+                                "Maximum allowed dimension exceeded");
+                    }
+                    if(err != NULL) {
+                        return -1;
+                    }
+                }
             }
         }
+        return nd;
     }
-    return nd;
+}
+
+NPY_NO_EXPORT int PyArray_IntpFromInt(PyObject *seq, npy_intp *vals)
+{
+    PyObject *err;
+
+    vals[0] = PyArray_PyIntAsIntp(seq);
+    if(vals[0] == -1) {
+        err = PyErr_Occurred();
+        if (err &&
+                PyErr_GivenExceptionMatches(err, PyExc_OverflowError)) {
+            PyErr_SetString(PyExc_ValueError,
+                    "Maximum allowed dimension exceeded");
+        }
+        if(err != NULL) {
+            return -1;
+        }
+    }
+    return 1;
 }
 
 /*NUMPY_API
