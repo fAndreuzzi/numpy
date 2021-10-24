@@ -78,6 +78,31 @@ PyArray_OutputConverter(PyObject *object, PyArrayObject **address)
     }
 }
 
+static npy_intp
+intp_from_scalar(PyObject *ob, npy_intp *vals, int val_idx)
+{
+    PyObject *err;
+
+    /*
+    * Convert the given value to an integer. Then store it and check for
+    * errors.
+    */
+    npy_intp value = PyArray_PyIntAsIntp(ob);
+    vals[val_idx] = PyArray_PyIntAsIntp(ob);
+    if(vals[val_idx] == -1) {
+        err = PyErr_Occurred();
+        if (err &&
+                PyErr_GivenExceptionMatches(err, PyExc_OverflowError)) {
+            PyErr_SetString(PyExc_ValueError,
+                    "Maximum allowed dimension exceeded");
+        }
+        if(err != NULL) {
+            return -1;
+        }
+    }
+    return value;
+}
+
 /*NUMPY_API
  * Get intp chunk from sequence
  *
@@ -111,7 +136,7 @@ PyArray_IntpConverter(PyObject *obj, PyArray_Dims *seq)
 
     /*
     * If obj is a scalar we skip all the useless computations and jump to
-    * PyArray_IntpFromScalar as soon as possible.
+    * intp_from_scalar as soon as possible.
     */
     if (PyLong_CheckExact(obj) || !PySequence_Check(obj)) {
         len = 1;
@@ -123,7 +148,7 @@ PyArray_IntpConverter(PyObject *obj, PyArray_Dims *seq)
         }
         seq->len = len;
 
-        int rvalue = PyArray_IntpFromScalar(obj, (npy_intp *)seq->ptr, 0);
+        int rvalue = intp_from_scalar(obj, (npy_intp *)seq->ptr, 0);
         if (rvalue == -1 || rvalue != len) {
             npy_free_cache_dim_obj(*seq);
             seq->ptr = NULL;
@@ -1026,32 +1051,12 @@ PyArray_IntpFromIndexSequence(PyObject *seq, npy_intp *vals, npy_intp maxvals)
                 return -1;
             }
 
-            if (PyArray_IntpFromScalar(op, vals, i) == -1) {
+            if (intp_from_scalar(op, vals, i) == -1) {
                 return -1;
             }
         }
     }
     return nd;
-}
-
-NPY_NO_EXPORT npy_intp
-PyArray_IntpFromScalar(PyObject *ob, npy_intp *vals, int val_idx)
-{
-    PyObject *err;
-
-    vals[val_idx] = PyArray_PyIntAsIntp(ob);
-    if(vals[val_idx] == -1) {
-        err = PyErr_Occurred();
-        if (err &&
-                PyErr_GivenExceptionMatches(err, PyExc_OverflowError)) {
-            PyErr_SetString(PyExc_ValueError,
-                    "Maximum allowed dimension exceeded");
-        }
-        if(err != NULL) {
-            return -1;
-        }
-    }
-    return 1;
 }
 
 /*NUMPY_API
